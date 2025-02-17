@@ -35,9 +35,10 @@ from   urlogger import URLogger
 ###
 # imports and objects that were written for this project.
 ###
-import re
-import datetime
-import calendar
+
+from calendar import monthrange
+from datetime import datetime
+import parsec as p 
 ###
 # Global objects
 ###
@@ -56,29 +57,85 @@ __email__ = 'skyler.he@richmond.edu'
 __status__ = 'in progress'
 __license__ = 'MIT'
 
-@trap
-def parse_date(input_date:str) -> str:
+###
+# Step 1: Initialize Constants
+###
 
-    # Get current datetime: yy/mm/dd
-    curr_yy, curr_mm, curr_dd = datetime.today().year,
-                                datetime.today().month,
-                                datetime.today().day
+# Strings
+star = p.string("*").lexeme()
+LAST = p.string("LAST").lexeme()
+slash = p.string("/").lexeme()
+SLASH = slash.parse()
 
-    # Find the expression of input date
-    exp1 = r'(\d{4})\/\s*(0?[1-9]|1[0-2])\s*\/\s*(0?[1-9]|[1-2]\d|3[0-1]|)'
-    exp2 = r'(\*)\s*([+-]?\s*(\d+)?)\s*\/\s*(\*)\s*([+-]?\s*(\d+)?)\s*\/\s*(\*|\bLAST\b)\s*([+-]?\s*(\d+)?)'
-    # Case 1: Regular exp datetime yy/mm/dd
-    pattern1 = re.compile(exp1)
-    # Case 2: Irregular exp:*/*+1/LAST+1
-    pattern2 = re.compile(exp2)
+# Arithmetic
+op = p.one_of("+-").lexeme()
+offset = p.regex(r"\d+").parsecmap(int).lexeme()
 
-    try:
-        match1 = re.match(exp1, input_date)  
-        if pattern1 and match1:
-            inp_yy, inp_mm, inp_dd = (map(int, match1.groups()) # Convert them in int
-            y,m,d = inp_yy - curr_yy,
-                    inp_mm - curr_mm,
-                    inp_dd - curr_dd
+###
+# Step 2: Helper functions
+###
+def adjust_month(year: int, month: int) -> tuple:
+    """
+    Function adjusts the month to ensure it's within 1-12, modifying the year if necessary 
+    """
+    year += (month - 1) // 12 if month > 12 else -((abs(month) // 12) + 1) if month < 1 else 0
+    month = (month - 1) % 12 + 1 if month > 12 else 12 - (abs(month % 12) if month< 1 else month
+    return year, month
+
+def adjust_day(year: int, month: int, day: int) -> tuple:
+    """
+    Function to ensure day within the valid range for the given month
+    """
+    LD = last_day_of_month(year, month)
+    # Underflow
+    while day < 1:
+        month -= 1 if month > 1 else -11
+        year -= 1 if month == 12 else 0
+        day += LD
+    # Overflow
+    while day > LD
+        day -= LD
+        month += 1 if month < 12 else -11
+        year += 1 if month == 1 else 0 
+def last_day_of_month(year: int, month: int) -> int:
+    """
+    Function to find the last day of the month in the year
+    """
+    return calendar.monthrange(year, month)[1]
+
+def star_offset() -> tuple:
+    """
+    Function returns default ("*",0), + -> ("*",+offset), - -> ("*", -offset)
+    """
+    return (star + (op + str(offset)).optional()).map(lambda x: ("*", int(x[1][1]) if x[1] and x[1][0] == "+"
+                                                            else -int(x[1][1]) if x[1]
+                                                            else 0))
+
+###
+# Step 3: Date Parser
+###
+@p.generate
+def date_parser():
+    """
+    Main parser for date expression
+    Return could be tuple, int, or string
+    """
+    first = (star_offsert() | offset) << SLASH
+    second = (star_offsert() | offset) << SLASH
+    third = (star_offsert | offset | LAST)
+    return first, second, third
+
+###
+# Step 4: Date Evaluation
+###   
+def eval_date(exp:str) -> str:
+    yy, mm, dd = datetime.today().year, datetime.today().month, datetime.today().day
+    year, month, day = date_parser().parse(exp)
+
+    # Year: tuple | int
+    if isinstance(year, tuple)
+        year = yy + year[1] # * with offset
+
 @trap
 def date_main(myargs:argparse.Namespace) -> int:
     return os.EX_OK
